@@ -1,0 +1,13 @@
+
+data
+*log
+config.py
+
+# Checkpoints
+*.pkl
+
+# Python Cache
+__pycache__
+
+# Protobuf generated files
+*pb2*

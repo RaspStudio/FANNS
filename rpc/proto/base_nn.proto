@@ -1,0 +1,22 @@
+
+
+
+syntax = "proto3";
+
+package rpc;
+
+message BaseNNRequest {
+    string id = 1;
+    bytes data = 2;
+    int32 phase = 3;
+    repeated int32 args = 4;
+    repeated float fargs = 5;
+}
+
+message BaseNNResponse {
+    repeated bytes datas = 1;
+}
+
+service BaseNNService {
+    rpc base_nn(BaseNNRequest) returns (BaseNNResponse);
+}
