@@ -26,15 +26,23 @@ class iNaturalistData(AbstractData):
             self.path_ = path
             self.data_ = None
             self.label_ = path.removesuffix('.jpg')
+            self.protected = False
         else:
             ... # from_bytes
 
     def data(self) -> Image.Image:
+        if self.protected:
+            return self.data_
         if self.data_ is None:
             ret = self.TRANSFORM(Image.open(self.path_))
         else:
             ret = self.data_
         return ret
+
+    def protected_data(self, protected_image: Image.Image):
+        if not self.protected:
+            self.protected = True
+            self.data_ = protected_image
 
     @staticmethod
     def from_bytes(data: bytes) -> 'iNaturalistData':
@@ -42,13 +50,15 @@ class iNaturalistData(AbstractData):
         data_len = int.from_bytes(data[:4], 'big')
         label_len = int.from_bytes(data[4:8], 'big')
         data_bytes = data[8:8+data_len]
-        label_bytes = data[8+data_len:]
+        label_bytes = data[8+data_len:8+data_len+label_len]
+        protected_bytes = data[8+data_len+label_len:]
         if len(label_bytes) != label_len:
             raise ValueError('The length of the label is incorrect.')
         
         ret = iNaturalistData()
         ret.data_ = Image.frombytes('RGB', (224, 224), data_bytes)
         ret.label_ = label_bytes.decode()
+        ret.protected = bool(protected_bytes) 
         return ret
     
     def to_bytes(self) -> bytes:
@@ -57,7 +67,9 @@ class iNaturalistData(AbstractData):
         data_len = len(data_bytes).to_bytes(4, 'big')
         label_bytes = self.label_.encode()
         label_len = len(label_bytes).to_bytes(4, 'big')
-        return data_len + label_len + data_bytes + label_bytes
+        protected_bytes = bytes([int(self.protected)])
+        protected_len = len(protected_bytes).to_bytes(4, 'big')
+        return data_len + label_len + data_bytes + label_bytes + protected_bytes
     
     def label(self) -> str:
         return self.label_

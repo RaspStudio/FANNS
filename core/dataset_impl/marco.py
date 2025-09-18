@@ -17,10 +17,13 @@ class MarcoData(AbstractData):
             self.path_ = path
             self.data_ = None
             self.label_ = path.removesuffix('.txt')
+            self.protected = False
         else:
             ... # from_bytes
 
     def data(self) -> str:
+        if self.protected:
+            return self.data_
         if self.data_ is None:
             try:
                 with open(self.path_, 'r',encoding='utf-8') as file:
@@ -32,20 +35,26 @@ class MarcoData(AbstractData):
             ret = self.data_
         return ret
 
+    def protected_data(self, protected_text: str):
+        if not self.protected:
+            self.protected = True
+            self.data_ = protected_text
+
+
     @staticmethod
     def from_bytes(data: str) -> 'MarcoData':
         data_len = int.from_bytes(data[:4],'big')
         label_len = int.from_bytes(data[4:8],'big')
         data_bytes = data[8:8+data_len]
-        label_bytes = data[8+data_len:]
-        
+        label_bytes = data[8+data_len:8+data_len+label_len]
+        protected_bytes = data[8+data_len+label_len:]
         if len(label_bytes) != label_len:
             raise ValueError('The length of the label is incorrect.')
         
         ret = MarcoData()
         ret.data_ = data_bytes.decode()
         ret.label_ = label_bytes.decode()
-
+        ret.protected = bool(protected_bytes)
         return ret
     
     def to_bytes(self) -> bytes:
@@ -53,7 +62,10 @@ class MarcoData(AbstractData):
         data_len = len(data_bytes).to_bytes(4,'big')
         label_bytes = self.label_.encode()
         label_len = len(label_bytes).to_bytes(4,'big')
-        ret = data_len + label_len + data_bytes + label_bytes
+        
+        protected_bytes = bytes([int(self.protected)])
+        protected_len = len(protected_bytes).to_bytes(4, 'big')
+        ret = data_len + label_len + data_bytes + label_bytes + protected_bytes
         return ret
     
     def label(self) -> str:

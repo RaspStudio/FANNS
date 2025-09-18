@@ -133,9 +133,9 @@ class DebertabaseModel[D:AbstractData](TorchTextEmbeddingModel):
 class LongformerBaseModel[D:AbstractData](TorchTextEmbeddingModel):
     def __init__(self, device: str):
         model = LongformerModel.from_pretrained(
-            '../model/longformer_model/models--allenai--longformer-base-4096/snapshots/301e6a42cb0d9976a6d6a26a079fef81c18aa895')
+            '/app/model/longformer_model/models--allenai--longformer-base-4096/snapshots/301e6a42cb0d9976a6d6a26a079fef81c18aa895')
         tokenizer = LongformerTokenizer.from_pretrained(
-            '../model/longformer_model/models--allenai--longformer-base-4096/snapshots/301e6a42cb0d9976a6d6a26a079fef81c18aa895')
+            '/app/model/longformer_model/models--allenai--longformer-base-4096/snapshots/301e6a42cb0d9976a6d6a26a079fef81c18aa895')
         super().__init__(device, model, tokenizer)
 
     def embed(self, data: Iterable[D]) -> list[vector]:

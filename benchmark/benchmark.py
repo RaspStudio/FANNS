@@ -9,6 +9,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 from core.index_impl import FlatIndex
 from core.interface import AbstractData, AbstractEmbeddingModel, vector
+from core.index_impl import FlatIndex, FlatIPIndex
 from rpc.federation import FederationManager
 
 def _run_a_query[D: AbstractData](algo: Callable[..., Sequence[tuple[float, D]]], fedmgr_args, query: D, k: int, 
@@ -117,7 +118,7 @@ class FANNSGroundTruth[D: AbstractData]:
             print(f"Embedded {i+1}/{len(self.queries_)}...", end="\r") if echo else ...
         print(f"Embedded {len(self.queries_)} Query Objects")
 
-    def ground_truth(self, overwrite: bool = False, use_index: bool = True) -> list[set[str]]:
+    def ground_truth(self, overwrite: bool = False, use_index: bool = True, use_IP: bool = False) -> list[set[str]]:
         # Checkpoint
         gtpkl_path = self.testid_ + "_gt.pkl"
 
@@ -130,14 +131,19 @@ class FANNSGroundTruth[D: AbstractData]:
 
         if use_index:
             # Using FlatIndex
-            indexpkl_path = self.testid_ + f"_index{len(self.datas_)}.pkl"
-            print(indexpkl_path)
+            if not use_IP:
+                indexpkl_path = self.testid_ + f"_index{len(self.datas_)}.pkl"
+            else:
+                indexpkl_path = self.testid_ + f"_indexIP{len(self.datas_)}.pkl"
             if not overwrite and os.path.exists(indexpkl_path):
                 print(f"Loading GT Index from pickle: {indexpkl_path}")
                 index = pickle.load(open(indexpkl_path, "rb"))
             else:
                 print(f"Creating GT Index to: {indexpkl_path}")
-                index = FlatIndex([(d, e) for d, e in zip(self.datas_, self.data_embs_)])
+                if use_IP:
+                    index = FlatIPIndex([(d, e) for d, e in zip(self.datas_, self.data_embs_)])
+                else:
+                    index = FlatIndex([(d, e) for d, e in zip(self.datas_, self.data_embs_)])
                 pickle.dump(index, open(indexpkl_path, "wb"))
             gtsdata: list[list[tuple[float, D]]] = []
             for query, query_emb in zip(self.queries_, self.query_embs_):

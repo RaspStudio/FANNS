@@ -1,3 +1,3 @@
 from .inaturalist import *
-from .imagenet import *
 from .marco import *
+from .imagenet import *

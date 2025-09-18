@@ -103,6 +103,98 @@ class FlatIndex[D: AbstractData](AbstractVectorStorage[D]):
         return index
 
 
+class FlatIPIndex[D: AbstractData](AbstractVectorStorage[D]):
+    '''A storage for image embeddings using FAISS.'''
+
+    def __init__(self, data: list[tuple[D, list[float]]]):
+        '''Initialize the image vector storage from the image embeddings.'''
+        embeddings, data_items_ = [], []
+        for data_item, embedding in data:
+            embeddings.append(embedding)
+            data_items_.append(data_item)
+    
+        self.embeddings_ = np.array(embeddings).astype('float32')
+        faiss.normalize_L2(self.embeddings_)
+        self.data_items_ = data_items_
+
+        self.restore_embeddings = []
+        self.restore_data_items = []
+        if len(self.embeddings_) != len(self.data_items_):
+            raise ValueError('The number of embeddings and data items are different.')
+
+        self.index_ = faiss.IndexFlatIP(self.embeddings_.shape[1])
+        self.index_.add(self.embeddings_)
+
+    def search(self, query: vector, k: int, with_vector: bool = False) -> list[tuple[float, D]] | list[tuple[float, D, vector]]:
+        query_embedding = np.array([query]).astype('float32')  # Convert to 2D numpy array
+        faiss.normalize_L2(query_embedding)
+        distances, indices = self.index_.search(query_embedding, k)
+
+        # Retrieve the nearest embeddings and their corresponding data items
+        results: list[tuple[float, D]] = []
+        for i in range(k):
+            idx: int = indices[0][i]
+            distance: float = distances[0][i]
+            data_item = self.data_items_[idx]
+            if with_vector:
+                results.append((distance, data_item, self.embeddings_[idx]))
+            else:
+                results.append((distance, data_item))
+
+        return results
+    
+    def get_vectors(self, items: Iterable[D]) -> list[vector]:
+        ret = []
+        for item in items:
+            idx = self.data_items_.index(item)
+            ret.append(self.embeddings_[idx])
+        return ret
+
+    def restore(self, sended_data: Iterable[tuple[D, vector]]):
+        for data, vector in sended_data:
+            self.restore_data_items.append(data)
+            self.restore_embeddings.append(vector)
+    
+    def get_from_restore(self, items: Iterable[D]) -> list[vector]:
+        ret = []
+        for item in items:
+            idx = self.restore_data_items.index(item)
+            ret.append(self.restore_embeddings[idx])
+        return ret
+        
+    @staticmethod
+    def distance(query: vector, target: vector) -> float:
+        '''Return the L2 distance between the query and target vectors.'''
+        qarr = np.array([query]).astype('float32')
+        tarr = np.array([target]).astype('float32')
+        faiss.normalize_L2(qarr)
+        faiss.normalize_L2(tarr)
+        qptr = faiss.swig_ptr(qarr)
+        tptr = faiss.swig_ptr(tarr)
+        return faiss.fvec_inner_product(qptr, tptr, len(query))
+
+    @staticmethod
+    def build_from_dataset(dataset: AbstractDataSet[D], model: AbstractEmbeddingModel[D], echo: bool = False) -> 'FlatIPIndex[D]':
+        import os
+        import pickle
+        # Prepare the data pairs
+        data_pairs: list[tuple[D, vector]] = []
+        for i, data in enumerate(dataset):
+            embpkl_path = data.label() + f".{model.__class__.__name__}.emb"
+            if os.path.exists(embpkl_path):
+                data_emb = pickle.load(open(embpkl_path, "rb"))
+            else:
+                data_emb = model.embed([data])[0]
+                pickle.dump(data_emb, open(embpkl_path, "wb"))
+            data_pairs.append((data, data_emb))
+            if echo:
+                print(f"Embedded {i+1}/{len(dataset)}...", end="\r")
+        # Create the index
+        index = FlatIPIndex(data_pairs)
+        if echo:
+            print(f"Finished Building FlatIPIndex with {len(dataset)} Objects")
+        return index
+
 class HNSWIndex[D: AbstractData](AbstractVectorStorage[D]):
     '''A storage for image embeddings using FAISS.'''
 

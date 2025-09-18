@@ -1,59 +1,94 @@
-import torch
-import faiss
-import concurrent.futures.process
 import os
+from core.model_impl import *
+
+os.environ["OMP_NUM_THREADS"] = "8"       
+os.environ["OPENBLAS_NUM_THREADS"] = "8"  
+os.environ["MKL_NUM_THREADS"] = "8"     
+os.environ["NUMEXPR_NUM_THREADS"] = "8" 
 import pickle
+import concurrent.futures.process
+from core.model_impl import *
+
 from typing import Type
 
-from core.algorithm import handler
-from core.index_impl import HNSWIndex
-from core.interface import (AbstractData, AbstractDataSet,
-                            AbstractEmbeddingModel, vector)
+from core.interface import AbstractData, AbstractDataSet, AbstractEmbeddingModel, vector, AbstractProtector
+from core.index_impl import FlatIndex,HNSWIndex,IVFPQIndex,FlatIPIndex,IVFFlatIndex
 from core.owner import OwnerContext
-from rpc import basenn_wrapper as fed_basenn
+from core.algorithm import handler
 from rpc import federation as fed
+from rpc import basenn_wrapper as fed_basenn
+import os, json, importlib, argparse
+
+import importlib
+
+def load_class(fqn: str):
+    module, name = fqn.rsplit(".", 1)
+    return getattr(importlib.import_module(module), name)
 
 
-def server_thread[D: AbstractData](path: str, port: str, model_cls: Type[AbstractEmbeddingModel[D]], dataset_cls: Type[AbstractDataSet[D]], data_cls: Type[D], device: str):
+def server_thread[D: AbstractData](path: str, port: str, model_cls: Type[AbstractEmbeddingModel[D]], dataset_cls: Type[AbstractDataSet[D]], data_cls: Type[D], device: str, privacy: bool, privacy_cls: Type[AbstractProtector]):
     # Initialize Server
+    print("begin", flush=True)
     model = model_cls(device)
-
-    # Offline Indexing
     pkl_path = f"{path}_{str(model.__class__.__name__)}_index.pkl"
+    print("success", flush=True)
     if os.path.exists(pkl_path):
         # Load Index From Pickle
-        print(f"[{port}] Loading Index From Pickle: {pkl_path}")
+        print(f"[{port}] Loading Index From Pickle: {pkl_path}", flush=True)
         vdb = pickle.load(open(pkl_path, "rb"))
+        print(type(vdb))
     else:
         # Create Index
-        print(f"[{port}] Creating Index To: {pkl_path}")
+        print(f"[{port}] Creating Index To: {pkl_path}", flush=True)
         dataset = dataset_cls(path)
         # Load or Generate Embeddings
-        vdb = HNSWIndex.build_from_dataset(dataset, model, echo=True)
+        vdb = FlatIndex.build_from_dataset(dataset, model, echo=True)
         pickle.dump(vdb, open(pkl_path, "wb"))
-
-    svc = fed.ServiceManager(port, [fed_basenn.get_servicer(
-        handler, model, OwnerContext(vdb), data_cls)])
+    if privacy:
+        privacy_protector = privacy_cls()
+    else:
+        privacy_protector = None
+  
+    svc = fed.ServiceManager(port, [fed_basenn.get_servicer(handler, model, OwnerContext(vdb), data_cls, privacy, privacy_protector, device)])
     svc.serve()
 
 
-if __name__ == "__main__":
-    import config
-    torch.multiprocessing.set_start_method('spawn')
-    faiss.omp_set_num_threads(config.OWNER_FAISS_THREADS)
-    torch.set_num_threads(4)
-    servers = []
-    print(config.OWNER_MODELS)
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        for i, (port, path) in enumerate(zip(config.PORTS, config.DATA_PATHS)):
-            server = executor.submit(
-                server_thread,
-                path,
-                str(port),
-                config.OWNER_MODELS[i],
-                config.DATASET_CLS,
-                config.DATA_CLS,
-                config.TORCH_DEVICE
-            )
+import torch
+import faiss
 
-    print("Server End")
+
+if __name__ == "__main__":
+    torch.set_num_threads(4)
+
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", dest="config_path",
+                        help="Path to config file (json).")
+    args = parser.parse_args()
+    print(args.config_path,flush=True)
+    
+
+    with open(args.config_path, "r") as f:
+        cfg = json.load(f)
+
+    print(torch.cuda.device_count(),flush=True)
+
+
+    model_classes = load_class(cfg["OWNER_MODEL"])
+    dataset_cls         = load_class(cfg["DATASET_CLS"])
+    data_cls            = load_class(cfg["DATA_CLS"])
+    if cfg['PRIVACY']:
+        privacy_cls       = load_class(cfg["PRIVACY_CLS"])
+    else:
+        privacy_cls = None
+    print(torch.cuda.is_available())
+    server_thread(cfg['DATA_PATH'],
+            str(cfg['PORT']),
+            model_classes,
+            dataset_cls,
+            data_cls,
+            cfg['TORCH_DEVICE'],
+            cfg['PRIVACY'],
+            privacy_cls)
+
+ 

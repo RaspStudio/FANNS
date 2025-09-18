@@ -122,3 +122,14 @@ class AbstractVectorStorage[D: AbstractData](ABC):
     def build_from_dataset(dataset: AbstractDataSet[D], model: AbstractEmbeddingModel[D]) -> 'AbstractVectorStorage':
         '''Build the vector storage from the dataset.'''
         ...
+
+class AbstractProtector[D: AbstractData](ABC):
+    '''An abstract class for privacy protect'''
+
+    @abstractmethod
+    def __init__(self):
+        '''Initialize'''
+    
+    @abstractmethod
+    def protect(self, items: Iterable[D]):
+        '''protect the privacy'''
