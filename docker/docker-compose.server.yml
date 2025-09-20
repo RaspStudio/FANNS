@@ -1,0 +1,22 @@
+services:
+  server:
+    build:
+      context: ./server
+    container_name: server
+    volumes:
+      - ../data:/app/data
+      - ../distribution:/app/distribution
+      - ./server/config_query_example.json:/app/config.json:ro
+      - ../model:/app/model
+    command: >
+      sh -c "
+      python run_query.py -c /app/config.json &&
+      echo '✅ Script finished. Container is keeping alive...' &&
+      sleep infinity
+      "
+    cap_add:
+      - NET_ADMIN
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    

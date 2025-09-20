@@ -1,0 +1,15 @@
+services:
+     
+  client0:
+    build:
+      context: ./client
+    volumes:
+      - ../data:/app/data
+      - ../distribution:/app/distribution
+      - ./client/config_client0_example.json:/app/config.json:ro
+      - ../model:/app/model
+      
+    command: ["python", "run_server.py", "-c", "/app/config.json"]
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all

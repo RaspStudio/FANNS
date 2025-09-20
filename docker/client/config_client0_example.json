@@ -1,0 +1,10 @@
+{
+    "OWNER_MODEL": "",
+    "PORT":8080,
+    "DATA_PATH": "/path_to_client_0.json",
+    "DATASET_CLS": "",
+    "DATA_CLS": "",
+    "PRIVACY_CLS": "",
+    "TORCH_DEVICE": "cuda:3",
+    "PRIVACY": false
+  }

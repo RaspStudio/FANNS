@@ -1,0 +1,14 @@
+{
+    "DATASET_CLS": "",
+    "DATA_CLS": "",
+    "SOCKETS": ["client0:8080"],
+    "QUERY_MODEL": "",
+    "QUERY_PATH": "/path_to_query.json",
+    "DATA_PATHS": ["/path_to_client_0.json"],
+    "QUERY_K": [10],
+    "QUERY_METHOD": "transfer_Model",
+    "QUERY_PARAMS": [[1,2,3,4,5,7,10,15,20,30,40]],
+    "TORCH_DEVICE": "cuda:3",
+    "QUERY_PARAM_NAMES":["overtakes"],
+    "SETTING": "test_docker"
+}
